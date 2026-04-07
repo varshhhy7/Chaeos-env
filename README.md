@@ -65,3 +65,14 @@ uv run python test_day1.py
 ```
 
 The validation script runs a dry initialization of the platform, routes a mock query mimicking an agent's request regarding demographic constants, retrieves simulated structured tool answers, grades the output independently, and returns a verified final episodic reward.
+
+## Simulation Benchmark Results
+
+A comprehensive multi-scenario dry run has been executed and exported over multiple complexity tiers. You can view the exact end-to-end trace logs in [results.md](results.md).
+
+**Tested Sequences:**
+1. **[Warmup Tier - Geography]**: Evaluates minimal single-call query fetching. (Verified 100% correct, no failure modifiers triggered).
+2. **[Beginner Tier - Economics]**: Evaluates dual-tool data ingestion and numeric integration across simulated knowledge bases.
+3. **[Expert Tier - Finance Verification]**: Enforces failure logic scaling (Stale Data/Timeouts/Corruption) and evaluates programmatic resilience checking when querying corporate revenue discrepancies. 
+
+These dynamic test iterations confirm that the `FaultInjector` appropriately bounds difficulties without breaking the `ChaosAgentEnvironment` feedback loop!
