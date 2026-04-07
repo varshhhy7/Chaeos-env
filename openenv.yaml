@@ -1,0 +1,4 @@
+name: chaosagent
+description: "ChaosAgent v2: Unreliable Tools Resilience Environment"
+entrypoint: "server.app:app"
+port: 8000
