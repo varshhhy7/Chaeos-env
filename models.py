@@ -1,72 +1,159 @@
-from typing import Any, Optional, Union
-from pydantic import BaseModel, Field
+from __future__ import annotations
 
-# === Ground Truth System ===
+from enum import Enum
+from typing import Any, Literal
+
+from openenv.core.env_server.types import Action, Observation, State
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+JSONValue = dict[str, Any] | list[Any] | str | int | float | bool | None
+JSONDict = dict[str, JSONValue]
+
+
+class DifficultyTier(str, Enum):
+    WARMUP = "warmup"
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    EXPERT = "expert"
+
+
+class FactType(str, Enum):
+    NUMERIC = "numeric"
+    TEXT = "text"
+    BOOLEAN = "boolean"
+    DATE = "date"
+
 
 class Fact(BaseModel):
-    """A single fact that must appear in the answer."""
-    key: str                         # e.g., "population"
-    value: Any                       # e.g., 67390000
-    type: str                        # "numeric", "text", "boolean", "date"
-    tolerance: float = 0.0           # For numeric: relative tolerance (0.05 = 5%)
-    alternatives: Optional[list[str]] = None   # Acceptable alternative text values
+    """A single fact that must appear in the submitted answer."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., min_length=1)
+    value: JSONValue
+    type: FactType
+    tolerance: float = Field(default=0.0, ge=0.0)
+    alternatives: list[str] = Field(default_factory=list)
+    weight: float = Field(default=1.0, gt=0.0)
+
 
 class Scenario(BaseModel):
-    """A single evaluation scenario."""
-    id: str                          # Unique identifier
-    question: str                    # Natural language question for the agent
-    answer: dict                     # Ground truth answer (key-value facts)
-    required_facts: list[Fact]       # What the agent must include in the answer
-    tool_data: dict[str, Any]        # Pre-computed clean outputs for each relevant tool
-    difficulty: str                  # warmup / beginner / intermediate / expert
-    min_tools_needed: int            # Minimum tools to answer correctly
-    tags: list[str]                  # Domain tags for curriculum tracking
-    cross_validation_tools: list[list[str]]  # Groups of tools that can verify each other
+    """A deterministic task plus its pre-computed tool outputs and answer key."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=1)
+    answer: JSONDict
+    required_facts: list[Fact] = Field(default_factory=list)
+    tool_data: dict[str, JSONValue] = Field(default_factory=dict)
+    difficulty: DifficultyTier
+    min_tools_needed: int = Field(default=1, ge=1)
+    tags: list[str] = Field(default_factory=list)
+    cross_validation_tools: list[list[str]] = Field(default_factory=list)
 
 
-# === Actions ===
-class CallToolAction(BaseModel):
-    """Call any of the 30 available tools."""
-    tool_name: str = Field(..., description="Name of the tool to call")
-    arguments: dict = Field(default_factory=dict, description="Tool arguments")
-
-class SubmitAnswerAction(BaseModel):
-    """Submit the final answer. Terminates the episode."""
-    answer: str = Field(..., description="The agent's final answer")
-    reasoning: str = Field(default="", description="How the agent arrived at this answer")
-
-ChaosAgentAction = Union[CallToolAction, SubmitAnswerAction]
-
-# === Observations ===
 class ToolDesc(BaseModel):
+    """Description surfaced to the agent in the initial observation."""
+
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     description: str
-    parameters: dict  # JSON Schema
+    parameters: dict[str, Any]
+
 
 class ToolResult(BaseModel):
+    """Result returned from a tool call."""
+
+    model_config = ConfigDict(extra="forbid")
+
     tool_name: str
-    result: Optional[dict] = None
-    error: Optional[str] = None
-    message: Optional[str] = None
+    result: JSONValue = None
+    error: str | None = None
+    message: str | None = None
+    fault_injected: bool = False
+    fault_mode: str | None = None
 
-class ChaosAgentObservation(BaseModel):
+
+class ChaosAgentAction(Action):
+    """Single OpenEnv action model for calling tools or submitting an answer."""
+
+    type: Literal["call_tool", "submit_answer"] = Field(
+        default="call_tool",
+        description="Action discriminator: call_tool or submit_answer",
+    )
+    tool_name: str | None = Field(default=None, description="Tool to call when type is call_tool")
+    arguments: dict[str, Any] = Field(
+        default_factory=dict, description="Arguments passed to the selected tool"
+    )
+    answer: str | None = Field(default=None, description="Final answer when type is submit_answer")
+    reasoning: str = Field(default="", description="Brief explanation for the submitted answer")
+
+    @field_validator("tool_name")
+    @classmethod
+    def _strip_tool_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @model_validator(mode="after")
+    def _validate_by_type(self) -> "ChaosAgentAction":
+        if self.type == "call_tool" and not self.tool_name:
+            raise ValueError("tool_name is required when type='call_tool'")
+        if self.type == "submit_answer" and not self.answer:
+            raise ValueError("answer is required when type='submit_answer'")
+        return self
+
+    @property
+    def is_submit(self) -> bool:
+        return self.type == "submit_answer"
+
+
+class CallToolAction(ChaosAgentAction):
+    """Convenience model for direct Python use and tests."""
+
+    type: Literal["call_tool"] = "call_tool"
+    tool_name: str
+    answer: None = None
+
+
+class SubmitAnswerAction(ChaosAgentAction):
+    """Convenience model for direct Python use and tests."""
+
+    type: Literal["submit_answer"] = "submit_answer"
+    tool_name: None = None
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    answer: str
+
+
+class ChaosAgentObservation(Observation):
+    """Observation returned after reset and each action."""
+
     task_question: str
-    tool_result: Optional[ToolResult] = None
-    available_tools: Optional[list[ToolDesc]] = None  # Only in first obs
-    warning: Optional[str] = None
-    steps_taken: int
-    max_steps: int
-
-# === State ===
-class ChaosAgentState(BaseModel):
     scenario_id: str
-    task_question: str
-    difficulty_tier: str
-    steps_taken: int
-    max_steps: int
-    tools_called: list[str]
-    faults_injected: int
-    is_done: bool
-    cumulative_reward: float
-    curriculum_tier: str
-    episodes_completed: int
+    tool_result: ToolResult | None = None
+    available_tools: list[ToolDesc] | None = Field(
+        default=None, description="Full tool catalog, included only after reset"
+    )
+    warning: str | None = None
+    steps_taken: int = Field(default=0, ge=0)
+    max_steps: int = Field(default=15, ge=1)
+
+
+class ChaosAgentState(State):
+    """Internal state exposed through OpenEnv's /state endpoint."""
+
+    scenario_id: str = ""
+    task_question: str = ""
+    difficulty_tier: DifficultyTier = DifficultyTier.WARMUP
+    max_steps: int = Field(default=15, ge=1)
+    tools_called: list[str] = Field(default_factory=list)
+    faults_injected: int = Field(default=0, ge=0)
+    is_done: bool = False
+    cumulative_reward: float = 0.0
+    curriculum_tier: DifficultyTier = DifficultyTier.WARMUP
+    episodes_completed: int = Field(default=0, ge=0)
+    submitted_answer: str | None = None

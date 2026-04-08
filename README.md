@@ -1,78 +1,143 @@
-# ChaosAgent v2: Unreliable Tools Resilience Environment
+---
+title: ChaosAgent OpenEnv
+emoji: "🛠️"
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 8000
+pinned: false
+---
 
-## Overview
+# ChaosAgent
 
-ChaosAgent is an advanced testing environment designed to evaluate the resilience of large language model (LLM) agents. In real-world deployments, tools and APIs frequently fail, return stale data, timeout, or present silent corruption. ChaosAgent systematically tests an agent's ability to cross-validate data, handle exceptions, and navigate a deliberately unreliable tool ecosystem to arrive at the correct ground truth.
+ChaosAgent is an OpenEnv environment for testing whether agents can answer
+questions when their tools may time out, rate-limit, return stale data, silently
+drop fields, truncate responses, or corrupt values.
 
-Version 2 introduces a fully deterministic scenario database, replacing the fragility of live APIs with pre-computed ground truths and a strictly programmatic evaluation criteria.
+The environment is deterministic by design: every scenario has a precomputed
+answer key and precomputed tool outputs. Retrieval tools route through that
+scenario data, while pure utility tools such as calculation, JSON querying,
+schema validation, scratchpad memory, and virtual file/ticket actions execute
+inside the episode.
 
-## Architecture and Core Infrastructure
+## OpenEnv Entry Points
 
-The core engine has been successfully implemented with the following key components:
+- Manifest: `openenv.yaml`
+- Server app: `server.app:app`
+- Local server command: `uv run server --port 8000`
+- Typed client: `client.ChaosAgentEnv`
+- Action model: `models.ChaosAgentAction`
+- Observation model: `models.ChaosAgentObservation`
+- Baseline inference script: `python inference.py --env-url http://127.0.0.1:8000`
+- Demo script: `python demo.py`
 
-### 1. Environment and State Management
-The `ChaosAgentEnvironment` serves as the primary orchestration layer. It tracks episodic state, maintains the continuous curriculum tier, monitors cyclic agent behaviors, and compiles penalty/bonus rewards based on step efficiency and tool utilization patterns.
+## What Is Implemented
 
-### 2. Fault Injector Engine
-To accurately simulate production instability, the environment features a sophisticated deterministic `FaultInjector`. Injection rates scale dynamically across four curriculum tiers (Warmup, Beginner, Intermediate, Expert) and include six distinct failure modes:
-* **TIMEOUT**: Simulates exceeding maximum request times.
-* **RATE_LIMIT**: Simulates HTTP 429 Too Many Requests errors.
-* **STALE_DATA**: Returns historically outdated information.
-* **SILENT_FAIL**: Returns empty or null values without an explicit error.
-* **PARTIAL_RESPONSE**: Truncates list or nested dictionary formations in payloads.
-* **CORRUPT_FIELD**: Subtly mutates numeric values or appends corruption flags to strings.
+- 30 distinct tools across retrieval, computation, state, validation, and action categories.
+- 55 deterministic scenario fixtures across warmup, beginner, intermediate, and expert tiers.
+- Seeded fault injection with tier-specific probabilities and never-fail internal tools.
+- Programmatic grading for numeric, text, boolean, and date facts.
+- Per-episode scratchpad, virtual file store, notifications, ticket updates, reports, and scheduled tasks.
+- OpenEnv-compatible FastAPI server with `/reset`, `/step`, `/state`, `/schema`, `/metadata`, `/health`, and `/mcp`.
+- Typed WebSocket client for agents and tests.
+- Pytest, Ruff, Mypy, local OpenEnv validation, and runtime OpenEnv validation coverage.
 
-### 3. Scenario Tool Router
-The environment relies on a suite of pre-computed scenario databases. The `ToolRouter` evaluates incoming agent queries using Jaccard-style overlap algorithms to fuzzy-match agent parameters against known database queries. This eliminates external network dependency and guarantees reproducible evaluations.
-
-### 4. Programmatic Grader
-To ensure stability during reinforcement learning (e.g., GRPO training), LLM-based grading has been excised. The programmatic `Grader` evaluates agent submissions through strict tolerance thresholding for numeric extractions, sub-string matching, and boolean logic validation.
-
-### 5. Tool Catalog and Live Equivalents
-The system implements a refined catalog of exactly 30 tools mapped across five domain capabilities (Information Retrieval, Computation & Transformation, Storage & State, Validation & Verification, and Communication & Action). While most tools route via the pre-computed scenario database, computation-heavy tools (e.g., calculator, Python execution, and working memory scratchpads) execute live natively within the environment to reflect internal agent cognition.
-
-## Project Structure
-
-```text
-Chaeos_Agent/
-├── server/
-│   ├── __init__.py
-│   ├── environment.py         # Main episode orchestration
-│   ├── fault_injector.py      # Failure mode probability injection
-│   ├── grader.py              # Formulaic answer evaluation
-│   ├── tool_router.py         # Fuzzy matching scenarios
-│   └── tools/
-│       ├── __init__.py
-│       ├── registry.py        # Pydantic schemas for the 30 tools
-│       └── live_tools.py      # Internal calculator/execution logic
-├── models.py                  # Core Pydantic state architectures
-├── openenv.yaml               # OpenEnv compatibility manifest
-├── pyproject.toml             # Dependency and build configuration
-├── Dockerfile                 # Containerization outline
-└── test_day1.py               # E2E validation script
-```
-
-## Quickstart and Testing
-
-The current project uses `uv` for high-performance dependency resolution and virtual environment standardization. 
-
-To initialize the environment and run the core pipeline simulation check:
+## Quickstart
 
 ```bash
-uv venv
-uv pip install -e .
-uv run python test_day1.py
+uv sync
+uv run pytest
+uv run ruff check .
+uv run mypy models.py server client.py tests
+uv run openenv validate --verbose
 ```
 
-The validation script runs a dry initialization of the platform, routes a mock query mimicking an agent's request regarding demographic constants, retrieves simulated structured tool answers, grades the output independently, and returns a verified final episodic reward.
+Run the environment locally:
 
-## Simulation Benchmark Results
+```bash
+uv run server --host 127.0.0.1 --port 8000
+```
 
-A comprehensive multi-scenario dry run has been executed and exported over multiple complexity tiers. You can view the exact end-to-end trace logs in [results.md](results.md).
+Validate a running server:
 
-**Tested Sequences:**
-1. **[Warmup Tier - Geography]**: Evaluates minimal single-call query fetching. (Verified 100% correct, no failure modifiers triggered).
-2. **[Beginner Tier - Economics]**: Evaluates dual-tool data ingestion and numeric integration across simulated knowledge bases.
-3. **[Expert Tier - Finance Verification]**: Enforces failure logic scaling (Stale Data/Timeouts/Corruption) and evaluates programmatic resilience checking when querying corporate revenue discrepancies. 
+```bash
+uv run openenv validate --url http://127.0.0.1:8000
+```
 
-These dynamic test iterations confirm that the `FaultInjector` appropriately bounds difficulties without breaking the `ChaosAgentEnvironment` feedback loop!
+Run the deterministic local demo:
+
+```bash
+uv run python demo.py
+```
+
+Run the Round 1 inference script against a running environment:
+
+```bash
+uv run python inference.py --env-url http://127.0.0.1:8000 --scenario-id W01
+```
+
+`inference.py` reads:
+
+- `API_BASE_URL`, defaulting to `https://router.huggingface.co/v1`
+- `MODEL_NAME`, defaulting to `Qwen/Qwen2.5-72B-Instruct`
+- `HF_TOKEN`; if absent, it falls back to `HUGGINGFACE_API_KEY`
+- `ENV_URL`, defaulting to `http://127.0.0.1:8000`
+- `LOCAL_IMAGE_NAME`, optional; when set, `inference.py` starts that local Docker image
+  through `ChaosAgentEnv.from_docker_image(...)`
+
+The inference output uses only:
+
+```text
+[START] task=<task_name> env=<benchmark> model=<model_name>
+[STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+[END] success=<true|false> steps=<n> score=<0.00> rewards=<r1,r2,...,rn>
+```
+
+Rewards and scores are formatted to two decimals, booleans are lower-case, and
+`[END]` is emitted even when an exception occurs.
+
+## Example Direct Use
+
+```python
+from models import CallToolAction, SubmitAnswerAction
+from server.environment import ChaosAgentEnvironment
+
+env = ChaosAgentEnvironment()
+obs = env.reset(seed=7, scenario_id="W01")
+
+obs = env.step(
+    CallToolAction(
+        tool_name="database_query",
+        arguments={"sql": "SELECT population FROM countries WHERE name='Germany'"},
+    )
+)
+
+obs = env.step(
+    SubmitAnswerAction(
+        answer="Germany has a population of 83,200,000.",
+        reasoning="Checked the deterministic database query result.",
+    )
+)
+
+print(obs.reward, obs.done)
+```
+
+## Design Notes
+
+ChaosAgent intentionally does not require live web/API keys during evaluation.
+For OpenEnv and RL training, reproducibility is more important than live API
+freshness: the agent must recover the scenario's hidden facts from tool calls,
+and the environment must be gradable without network variance. Utility tools are
+implemented as real deterministic episode tools rather than no-op mocks.
+
+To add new tasks, extend the structured fixture records in
+`server/scenario_repository.py`; the repository validates that the default
+fixture set contains exactly 55 scenarios.
+
+## Submission Notes
+
+- GitHub remote currently configured locally: `https://github.com/varshhhy7/Chaeos-env.git`
+- Requirements file: `requirements.txt`
+- Docker image entrypoint: `uvicorn server.app:app --host 0.0.0.0 --port 8000`
+- Hugging Face Space repo URL: `https://huggingface.co/spaces/Prahaladha/chaosagent-openenv`
+- Hugging Face Space runtime URL: `https://prahaladha-chaosagent-openenv.hf.space`

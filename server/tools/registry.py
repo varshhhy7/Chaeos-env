@@ -1,9 +1,10 @@
-from typing import Dict, Any
+from __future__ import annotations
 
-# This registry contains the definitions of all 30 tools for the environment.
-# These match the design from section 2 of chaosagent_v2.md
+from typing import Any
 
-TOOL_REGISTRY = [
+# This registry contains the canonical 30-tool contract for the environment.
+
+TOOL_REGISTRY: list[dict[str, Any]] = [
     # 2.1 Information Retrieval
     {
         "name": "web_search",
@@ -11,8 +12,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Search query"}},
-            "required": ["query"]
-        }
+            "required": ["query"],
+        },
     },
     {
         "name": "fetch_url",
@@ -20,8 +21,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"url": {"type": "string"}},
-            "required": ["url"]
-        }
+            "required": ["url"],
+        },
     },
     {
         "name": "knowledge_base_lookup",
@@ -29,8 +30,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"entity": {"type": "string"}},
-            "required": ["entity"]
-        }
+            "required": ["entity"],
+        },
     },
     {
         "name": "database_query",
@@ -38,8 +39,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"sql": {"type": "string"}},
-            "required": ["sql"]
-        }
+            "required": ["sql"],
+        },
     },
     {
         "name": "document_search",
@@ -47,16 +48,16 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
-            "required": ["query"]
-        }
+            "required": ["query"],
+        },
     },
     {
         "name": "get_current_datetime",
         "description": "Get current date, time, timezone",
         "parameters": {
             "type": "object",
-            "properties": {"timezone": {"type": "string", "default": "UTC"}}
-        }
+            "properties": {"timezone": {"type": "string", "default": "UTC"}},
+        },
     },
     {
         "name": "read_file",
@@ -64,19 +65,21 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"path": {"type": "string"}},
-            "required": ["path"]
-        }
+            "required": ["path"],
+        },
     },
     {
         "name": "api_call",
         "description": "Make a generic HTTP API request",
         "parameters": {
             "type": "object",
-            "properties": {"url": {"type": "string"}, "method": {"type": "string", "default": "GET"}},
-            "required": ["url"]
-        }
+            "properties": {
+                "url": {"type": "string"},
+                "method": {"type": "string", "default": "GET"},
+            },
+            "required": ["url"],
+        },
     },
-
     # 2.2 Computation & Transformation
     {
         "name": "calculator",
@@ -84,8 +87,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"expression": {"type": "string"}},
-            "required": ["expression"]
-        }
+            "required": ["expression"],
+        },
     },
     {
         "name": "python_execute",
@@ -93,8 +96,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"code": {"type": "string"}},
-            "required": ["code"]
-        }
+            "required": ["code"],
+        },
     },
     {
         "name": "text_extract",
@@ -102,8 +105,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"text": {"type": "string"}, "pattern": {"type": "string"}},
-            "required": ["text", "pattern"]
-        }
+            "required": ["text", "pattern"],
+        },
     },
     {
         "name": "data_transform",
@@ -111,17 +114,21 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"data": {"type": "string"}, "operation": {"type": "string"}},
-            "required": ["data", "operation"]
-        }
+            "required": ["data", "operation"],
+        },
     },
     {
         "name": "compare_values",
         "description": "Compare two values with tolerance",
         "parameters": {
             "type": "object",
-            "properties": {"value1": {"type": "number"}, "value2": {"type": "number"}, "tolerance": {"type": "number", "default": 0.0}},
-            "required": ["value1", "value2"]
-        }
+            "properties": {
+                "value1": {"type": "number"},
+                "value2": {"type": "number"},
+                "tolerance": {"type": "number", "default": 0.0},
+            },
+            "required": ["value1", "value2"],
+        },
     },
     {
         "name": "json_query",
@@ -129,8 +136,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"data": {"type": "string"}, "query": {"type": "string"}},
-            "required": ["data", "query"]
-        }
+            "required": ["data", "query"],
+        },
     },
     {
         "name": "translate",
@@ -138,10 +145,9 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"text": {"type": "string"}, "target_language": {"type": "string"}},
-            "required": ["text", "target_language"]
-        }
+            "required": ["text", "target_language"],
+        },
     },
-
     # 2.3 Storage & State
     {
         "name": "scratchpad_write",
@@ -149,8 +155,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"key": {"type": "string"}, "value": {"type": "string"}},
-            "required": ["key", "value"]
-        }
+            "required": ["key", "value"],
+        },
     },
     {
         "name": "scratchpad_read",
@@ -158,8 +164,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"key": {"type": "string"}},
-            "required": ["key"]
-        }
+            "required": ["key"],
+        },
     },
     {
         "name": "write_file",
@@ -167,8 +173,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
-            "required": ["path", "content"]
-        }
+            "required": ["path", "content"],
+        },
     },
     {
         "name": "database_insert",
@@ -176,8 +182,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"table": {"type": "string"}, "data": {"type": "string"}},
-            "required": ["table", "data"]
-        }
+            "required": ["table", "data"],
+        },
     },
     {
         "name": "create_report",
@@ -185,10 +191,9 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"content": {"type": "string"}},
-            "required": ["content"]
-        }
+            "required": ["content"],
+        },
     },
-
     # 2.4 Validation & Verification
     {
         "name": "validate_url",
@@ -196,8 +201,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"url": {"type": "string"}},
-            "required": ["url"]
-        }
+            "required": ["url"],
+        },
     },
     {
         "name": "validate_data",
@@ -205,8 +210,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"data": {"type": "string"}, "schema": {"type": "string"}},
-            "required": ["data", "schema"]
-        }
+            "required": ["data", "schema"],
+        },
     },
     {
         "name": "check_consistency",
@@ -214,8 +219,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"source1": {"type": "string"}, "source2": {"type": "string"}},
-            "required": ["source1", "source2"]
-        }
+            "required": ["source1", "source2"],
+        },
     },
     {
         "name": "fact_check",
@@ -223,8 +228,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"claim": {"type": "string"}},
-            "required": ["claim"]
-        }
+            "required": ["claim"],
+        },
     },
     {
         "name": "hash_verify",
@@ -232,10 +237,9 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"data": {"type": "string"}, "expected_hash": {"type": "string"}},
-            "required": ["data", "expected_hash"]
-        }
+            "required": ["data", "expected_hash"],
+        },
     },
-
     # 2.5 Communication & Action
     {
         "name": "send_notification",
@@ -243,8 +247,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"message": {"type": "string"}},
-            "required": ["message"]
-        }
+            "required": ["message"],
+        },
     },
     {
         "name": "schedule_task",
@@ -252,8 +256,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"task": {"type": "string"}, "time": {"type": "string"}},
-            "required": ["task", "time"]
-        }
+            "required": ["task", "time"],
+        },
     },
     {
         "name": "update_ticket",
@@ -261,8 +265,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"ticket_id": {"type": "string"}, "update": {"type": "string"}},
-            "required": ["ticket_id", "update"]
-        }
+            "required": ["ticket_id", "update"],
+        },
     },
     {
         "name": "request_human_review",
@@ -270,8 +274,8 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"reason": {"type": "string"}},
-            "required": ["reason"]
-        }
+            "required": ["reason"],
+        },
     },
     # The submit_answer tool is technically an Action, but we can list it for completeness or handle it structurally.
     {
@@ -280,10 +284,28 @@ TOOL_REGISTRY = [
         "parameters": {
             "type": "object",
             "properties": {"answer": {"type": "string"}, "reasoning": {"type": "string"}},
-            "required": ["answer"]
-        }
-    }
+            "required": ["answer"],
+        },
+    },
 ]
 
-def get_all_tools() -> list[Dict[str, Any]]:
-    return TOOL_REGISTRY
+
+def get_all_tools() -> list[dict[str, Any]]:
+    return [dict(tool) for tool in TOOL_REGISTRY]
+
+
+def get_tool_names() -> set[str]:
+    return {tool["name"] for tool in TOOL_REGISTRY}
+
+
+def is_known_tool(tool_name: str) -> bool:
+    return tool_name in get_tool_names()
+
+
+def validate_tool_registry() -> None:
+    names = [tool["name"] for tool in TOOL_REGISTRY]
+    if len(names) != 30:
+        raise ValueError(f"Expected 30 tools, found {len(names)}")
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        raise ValueError(f"Duplicate tool names: {duplicates}")

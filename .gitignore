@@ -11,15 +11,17 @@ __pycache__/
 venv/
 env/
 ENV/
-
-# Dependency locking
-uv.lock
+.env
+.env.*
 
 # IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Build metadata
+*.egg-info/
 
 # OS files
 .DS_Store

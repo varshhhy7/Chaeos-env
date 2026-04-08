@@ -1,4 +1,7 @@
+spec_version: 1
 name: chaosagent
-description: "ChaosAgent v2: Unreliable Tools Resilience Environment"
-entrypoint: "server.app:app"
+type: space
+runtime: fastapi
+app: server.app:app
 port: 8000
+description: "ChaosAgent v2: deterministic unreliable-tool resilience environment"
