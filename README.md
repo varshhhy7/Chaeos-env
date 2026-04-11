@@ -1,13 +1,3 @@
----
-title: ChaosAgent V2 Environment
-emoji: "🌩️"
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 8000
-pinned: false
----
-
 # 🌩️ ChaosAgent V2: Unreliable-Tool Resilience Environment
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
