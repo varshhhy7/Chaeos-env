@@ -645,10 +645,12 @@ async def run_episode(
     env: ChaosAgentEnv | None = None
 
     try:
-        if local_image_name:
-            env = await ChaosAgentEnv.from_docker_image(local_image_name)
-        else:
+        try:
             env = await ChaosAgentEnv(base_url=env_url).connect()
+        except Exception:
+            if not local_image_name:
+                raise
+            env = await ChaosAgentEnv.from_docker_image(local_image_name)
 
         reset_kwargs: dict[str, Any] = {}
         reset_kwargs["task_id"] = task_id
@@ -713,7 +715,6 @@ def main() -> None:
     benchmark_tasks = all_tasks()
     for benchmark_task in benchmark_tasks:
         episode = EpisodeResult()
-        caught: BaseException | None = None
 
         _emit_start(task=benchmark_task.id, env=BENCHMARK, model_name=MODEL_NAME)
         try:
@@ -727,8 +728,8 @@ def main() -> None:
                     max_agent_steps=min(args.max_agent_steps, benchmark_task.max_steps),
                 )
             )
-        except Exception as exc:
-            caught = exc
+        except Exception:
+            episode = EpisodeResult(success=False, steps=0, score=0.0, rewards=[])
         finally:
             _emit_end(
                 success=episode.success,
@@ -736,9 +737,6 @@ def main() -> None:
                 score=episode.score,
                 rewards=episode.rewards,
             )
-
-        if caught is not None:
-            raise caught
 
 
 if __name__ == "__main__":
