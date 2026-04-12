@@ -23,7 +23,6 @@ DEFAULT_BENCHMARK = "chaosagent"
 
 API_BASE_URL = os.getenv("API_BASE_URL", DEFAULT_API_BASE_URL)
 MODEL_NAME = os.getenv("MODEL_NAME", DEFAULT_MODEL_NAME)
-HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
 ENV_URL = os.getenv("ENV_URL", DEFAULT_ENV_URL)
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME") or os.getenv("IMAGE_NAME")
 BENCHMARK = os.getenv("BENCHMARK", DEFAULT_BENCHMARK)
@@ -128,16 +127,16 @@ def _emit_end(
 
 
 def _validate_hf_token() -> str:
-    token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+    token = os.getenv("API_KEY") or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
     if not token:
         raise RuntimeError(
-            "HF_TOKEN is required. Set HF_TOKEN, or set HUGGINGFACE_API_KEY for this project."
+            "API_KEY is required for evaluation. Locally, set API_KEY, HF_TOKEN, or HUGGINGFACE_API_KEY."
         )
     return token
 
 
 def _make_openai_client() -> OpenAI:
-    return OpenAI(api_key=_validate_hf_token(), base_url=API_BASE_URL)
+    return OpenAI(api_key=_validate_hf_token(), base_url=os.getenv("API_BASE_URL", API_BASE_URL))
 
 
 def _observation_payload(observation: ChaosAgentObservation) -> dict[str, Any]:
@@ -619,6 +618,23 @@ def _next_action(
     return _parse_action(model_text), model_text
 
 
+def _proxy_touch(
+    client: OpenAI,
+    history: list[dict[str, str]],
+    observation: ChaosAgentObservation,
+) -> None:
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=cast(
+            list[ChatCompletionMessageParam],
+            _messages_for_observation(history, observation),
+        ),
+        temperature=0,
+        max_tokens=32,
+    )
+    history.append({"role": "assistant", "content": response.choices[0].message.content or ""})
+
+
 def _score_from_step(
     observation: ChaosAgentObservation,
     reward: float,
@@ -660,6 +676,10 @@ async def run_episode(
 
         result = await env.reset(**reset_kwargs)
         observation = result.observation
+        try:
+            _proxy_touch(llm_client, history, observation)
+        except Exception:
+            pass
 
         for step in range(1, max_agent_steps + 1):
             episode.steps = step

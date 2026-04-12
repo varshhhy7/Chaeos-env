@@ -186,6 +186,7 @@ def test_openenv_fastapi_contract() -> None:
 def test_inference_token_fallback_and_output_format(
     monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
 ) -> None:
+    monkeypatch.delenv("API_KEY", raising=False)
     monkeypatch.delenv("HF_TOKEN", raising=False)
     monkeypatch.setenv("HUGGINGFACE_API_KEY", "dummy-token")
 
@@ -206,11 +207,19 @@ def test_inference_token_fallback_and_output_format(
 
 
 def test_inference_missing_token_raises(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.delenv("API_KEY", raising=False)
     monkeypatch.delenv("HF_TOKEN", raising=False)
     monkeypatch.delenv("HUGGINGFACE_API_KEY", raising=False)
 
-    with pytest.raises(RuntimeError, match="HF_TOKEN is required"):
+    with pytest.raises(RuntimeError, match="API_KEY is required"):
         inference._validate_hf_token()
+
+
+def test_inference_prefers_api_key_when_present(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("API_KEY", "proxy-key")
+    monkeypatch.setenv("HF_TOKEN", "local-key")
+
+    assert inference._validate_hf_token() == "proxy-key"
 
 
 def test_client_parser_keeps_top_level_metadata() -> None:

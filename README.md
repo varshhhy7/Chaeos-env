@@ -102,7 +102,8 @@ Environment variables:
 
 - `API_BASE_URL`, default `https://router.huggingface.co/v1`
 - `MODEL_NAME`, default `Qwen/Qwen2.5-72B-Instruct`
-- `HF_TOKEN`, required; falls back to `HUGGINGFACE_API_KEY`
+- `API_KEY`, preferred during evaluation
+- `HF_TOKEN`, local fallback; also falls back to `HUGGINGFACE_API_KEY`
 - `ENV_URL`, default `http://127.0.0.1:8000`
 - `LOCAL_IMAGE_NAME`, optional for `from_docker_image(...)`
 
