@@ -44,6 +44,7 @@ class Scenario(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., min_length=1)
+    benchmark_task_id: str = Field(..., min_length=1)
     question: str = Field(..., min_length=1)
     answer: JSONDict
     required_facts: list[Fact] = Field(default_factory=list)
@@ -132,6 +133,8 @@ class SubmitAnswerAction(ChaosAgentAction):
 class ChaosAgentObservation(Observation):
     """Observation returned after reset and each action."""
 
+    task_id: str = ""
+    task_name: str = ""
     task_question: str
     scenario_id: str
     tool_result: ToolResult | None = None
@@ -146,6 +149,9 @@ class ChaosAgentObservation(Observation):
 class ChaosAgentState(State):
     """Internal state exposed through OpenEnv's /state endpoint."""
 
+    task_id: str = "task1"
+    task_name: str = ""
+    task_description: str = ""
     scenario_id: str = ""
     task_question: str = ""
     difficulty_tier: DifficultyTier = DifficultyTier.WARMUP
@@ -157,3 +163,17 @@ class ChaosAgentState(State):
     curriculum_tier: DifficultyTier = DifficultyTier.WARMUP
     episodes_completed: int = Field(default=0, ge=0)
     submitted_answer: str | None = None
+    tool_failures_observed: int = Field(default=0, ge=0)
+    tool_successes_observed: int = Field(default=0, ge=0)
+    repeat_calls: int = Field(default=0, ge=0)
+    warning_events_observed: int = Field(default=0, ge=0)
+    retrieval_successes: int = Field(default=0, ge=0)
+    verification_calls: int = Field(default=0, ge=0)
+    compute_calls: int = Field(default=0, ge=0)
+    artifact_actions: int = Field(default=0, ge=0)
+    recovery_switches: int = Field(default=0, ge=0)
+    last_tool_name: str | None = None
+    last_tool_error: str | None = None
+    final_correctness: float = Field(default=0.0, ge=0.0, le=1.0)
+    cross_validation_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    task_score: float = Field(default=0.0, ge=0.0, le=1.0)

@@ -5,12 +5,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from models import Scenario
+from server.task_workspace import TaskWorkspace
 from server.tools.live_tools import LiveTools
 from server.tools.registry import is_known_tool
 
 
 class ToolRouter:
-    """Routes tool calls to deterministic scenario data with fuzzy matching."""
+    """Routes tool calls to workspace-backed systems with scenario fallbacks."""
 
     QUERY_ARGUMENT_KEYS = (
         "query",
@@ -34,10 +35,18 @@ class ToolRouter:
     )
 
     def route(
-        self, tool_name: str, arguments: Mapping[str, Any], scenario: Scenario
+        self,
+        tool_name: str,
+        arguments: Mapping[str, Any],
+        scenario: Scenario,
+        workspace: TaskWorkspace | None = None,
     ) -> dict[str, Any]:
         if not is_known_tool(tool_name):
             return {"error": f"Unknown tool: {tool_name}"}
+
+        workspace_result = self._route_workspace_tool(tool_name, arguments, workspace)
+        if workspace_result is not None:
+            return workspace_result
 
         tool_entries = scenario.tool_data.get(tool_name)
         if tool_entries == "always_live" or (
@@ -67,6 +76,39 @@ class ToolRouter:
             return self._extract_result(tool_entries)
 
         return {"result": tool_entries}
+
+    def _route_workspace_tool(
+        self,
+        tool_name: str,
+        arguments: Mapping[str, Any],
+        workspace: TaskWorkspace | None,
+    ) -> dict[str, Any] | None:
+        if workspace is None:
+            return None
+
+        if tool_name == "knowledge_base_lookup":
+            return workspace.lookup_entity(str(arguments.get("entity", "")))
+        if tool_name == "database_query":
+            return workspace.run_sql(str(arguments.get("sql", "")))
+        if tool_name == "document_search":
+            return workspace.search_documents(str(arguments.get("query", "")))
+        if tool_name == "web_search":
+            return workspace.web_search(str(arguments.get("query", "")))
+        if tool_name == "fetch_url":
+            return workspace.fetch_url(str(arguments.get("url", "")))
+        if tool_name == "fact_check":
+            return workspace.fact_check(str(arguments.get("claim", "")))
+        if tool_name == "check_consistency":
+            return workspace.check_consistency(
+                str(arguments.get("source1", "")),
+                str(arguments.get("source2", "")),
+            )
+        if tool_name == "api_call":
+            return workspace.api_call(
+                str(arguments.get("url", "")),
+                str(arguments.get("method", "GET")),
+            )
+        return None
 
     def _argument_text(self, arguments: Mapping[str, Any]) -> str:
         return " ".join(

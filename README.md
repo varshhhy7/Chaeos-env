@@ -1,24 +1,38 @@
 ---
 title: ChaosAgent OpenEnv
-emoji: "🛠️"
 colorFrom: blue
 colorTo: green
 sdk: docker
 app_port: 8000
+suggested_hardware: cpu-basic
+header: mini
+short_description: OpenEnv benchmark for resilient tool use under failures.
 pinned: false
 ---
 
 # ChaosAgent
 
-ChaosAgent is an OpenEnv environment for testing whether agents can answer
-questions when their tools may time out, rate-limit, return stale data, silently
+ChaosAgent is an OpenEnv benchmark for agents operating under unreliable tools.
+The core problem stays the same across the benchmark: the agent must answer
+correctly while tools may time out, rate-limit, return stale data, silently
 drop fields, truncate responses, or corrupt values.
 
-The environment is deterministic by design: every scenario has a precomputed
-answer key and precomputed tool outputs. Retrieval tools route through that
-scenario data, while pure utility tools such as calculation, JSON querying,
-schema validation, scratchpad memory, and virtual file/ticket actions execute
-inside the episode.
+The benchmark is organized as three explicit tasks:
+
+- `task1`: single-failure recovery
+- `task2`: cross-tool conflict resolution
+- `task3`: cascading failure adaptation
+
+Scenarios provide the question and answer key, but the tools execute against a
+real per-episode workspace backed by internal systems:
+
+- SQLite tables for structured data
+- indexed document corpus
+- synthetic URLs and internal APIs
+- virtual files, notes, reports, notifications, and tickets
+
+That keeps the environment reproducible for grading without reducing the tool
+surface to hard-coded string lookup.
 
 ## OpenEnv Entry Points
 
@@ -28,19 +42,28 @@ inside the episode.
 - Typed client: `client.ChaosAgentEnv`
 - Action model: `models.ChaosAgentAction`
 - Observation model: `models.ChaosAgentObservation`
-- Baseline inference script: `python inference.py --env-url http://127.0.0.1:8000`
 - Demo script: `python demo.py`
+- Inference script: `python inference.py --env-url http://127.0.0.1:8000`
 
 ## What Is Implemented
 
-- 30 distinct tools across retrieval, computation, state, validation, and action categories.
-- 55 deterministic scenario fixtures across warmup, beginner, intermediate, and expert tiers.
-- Seeded fault injection with tier-specific probabilities and never-fail internal tools.
-- Programmatic grading for numeric, text, boolean, and date facts.
-- Per-episode scratchpad, virtual file store, notifications, ticket updates, reports, and scheduled tasks.
-- OpenEnv-compatible FastAPI server with `/reset`, `/step`, `/state`, `/schema`, `/metadata`, `/health`, and `/mcp`.
-- Typed WebSocket client for agents and tests.
-- Pytest, Ruff, Mypy, local OpenEnv validation, and runtime OpenEnv validation coverage.
+- 30 tools across retrieval, computation, storage, validation, and action
+- 55 deterministic scenarios across warmup, beginner, intermediate, and expert tiers
+- 3 named tasks with distinct grading rubrics and scores clamped to `(0, 1)`
+- per-episode workspace-backed retrieval instead of static scenario tool payloads
+- seeded fault injection with tier-specific probabilities
+- typed OpenEnv FastAPI server, typed client, tests, lint, type checking, and validator coverage
+
+## Benchmark Tasks
+
+| Task | Focus | Scenario pool | Max steps | What the grader rewards |
+|------|-------|---------------|-----------|--------------------------|
+| `task1` | recover from one bad retrieval path | warmup + beginner | 6 | correctness, switching away from failing calls, efficient retrieval |
+| `task2` | reconcile conflicting evidence | intermediate | 8 | correctness, cross-validation, compute/verification usage |
+| `task3` | adapt under repeated faults | expert | 10 | correctness, resilience, verification, evidence management |
+
+Task guidance is included in reset metadata so an LLM agent can tell what
+behavior is expected without seeing the hidden answer.
 
 ## Quickstart
 
@@ -48,44 +71,42 @@ inside the episode.
 uv sync
 uv run pytest
 uv run ruff check .
-uv run mypy models.py server client.py tests
+uv run mypy models.py server client.py inference.py demo.py tests
 uv run openenv validate --verbose
 ```
 
-Run the environment locally:
+Run the server:
 
 ```bash
 uv run server --host 127.0.0.1 --port 8000
 ```
 
-Validate a running server:
-
-```bash
-uv run openenv validate --url http://127.0.0.1:8000
-```
-
-Run the deterministic local demo:
+Run the demo:
 
 ```bash
 uv run python demo.py
 ```
 
-Run the Round 1 inference script against a running environment:
+Run inference against a running server:
 
 ```bash
-uv run python inference.py --env-url http://127.0.0.1:8000 --scenario-id W01
+uv run python inference.py --env-url http://127.0.0.1:8000
 ```
 
-`inference.py` reads:
+## Inference Contract
 
-- `API_BASE_URL`, defaulting to `https://router.huggingface.co/v1`
-- `MODEL_NAME`, defaulting to `Qwen/Qwen2.5-72B-Instruct`
-- `HF_TOKEN`; if absent, it falls back to `HUGGINGFACE_API_KEY`
-- `ENV_URL`, defaulting to `http://127.0.0.1:8000`
-- `LOCAL_IMAGE_NAME`, optional; when set, `inference.py` starts that local Docker image
-  through `ChaosAgentEnv.from_docker_image(...)`
+`inference.py` is at the repo root and uses the OpenAI Python client for all
+LLM calls.
 
-The inference output uses only:
+Environment variables:
+
+- `API_BASE_URL`, default `https://router.huggingface.co/v1`
+- `MODEL_NAME`, default `Qwen/Qwen2.5-72B-Instruct`
+- `HF_TOKEN`, required; falls back to `HUGGINGFACE_API_KEY`
+- `ENV_URL`, default `http://127.0.0.1:8000`
+- `LOCAL_IMAGE_NAME`, optional for `from_docker_image(...)`
+
+Stdout format:
 
 ```text
 [START] task=<task_name> env=<benchmark> model=<model_name>
@@ -93,51 +114,27 @@ The inference output uses only:
 [END] success=<true|false> steps=<n> score=<0.00> rewards=<r1,r2,...,rn>
 ```
 
-Rewards and scores are formatted to two decimals, booleans are lower-case, and
-`[END]` is emitted even when an exception occurs.
-
-## Example Direct Use
-
-```python
-from models import CallToolAction, SubmitAnswerAction
-from server.environment import ChaosAgentEnvironment
-
-env = ChaosAgentEnvironment()
-obs = env.reset(seed=7, scenario_id="W01")
-
-obs = env.step(
-    CallToolAction(
-        tool_name="database_query",
-        arguments={"sql": "SELECT population FROM countries WHERE name='Germany'"},
-    )
-)
-
-obs = env.step(
-    SubmitAnswerAction(
-        answer="Germany has a population of 83,200,000.",
-        reasoning="Checked the deterministic database query result.",
-    )
-)
-
-print(obs.reward, obs.done)
-```
+`[END]` is always emitted, rewards and scores are formatted to two decimals, and
+booleans are lower-case.
 
 ## Design Notes
 
-ChaosAgent intentionally does not require live web/API keys during evaluation.
-For OpenEnv and RL training, reproducibility is more important than live API
-freshness: the agent must recover the scenario's hidden facts from tool calls,
-and the environment must be gradable without network variance. Utility tools are
-implemented as real deterministic episode tools rather than no-op mocks.
+ChaosAgent is designed to be trainable for LLM agents:
 
-To add new tasks, extend the structured fixture records in
-`server/scenario_repository.py`; the repository validates that the default
-fixture set contains exactly 55 scenarios.
+- typed action and observation contracts
+- explicit tool schemas on reset
+- deterministic backends and graders
+- task guidance in metadata
+- task scores shaped around recovery, cross-validation, computation, and evidence management
 
-## Submission Notes
+It deliberately avoids depending on live external APIs for benchmark
+correctness. External APIs can be added later as optional tool adapters, but the
+grading path stays deterministic.
 
-- GitHub remote currently configured locally: `https://github.com/varshhhy7/Chaeos-env.git`
+## Submission Surface
+
+- Public GitHub repo: `https://github.com/varshhhy7/Chaeos-env`
+- Hugging Face Space repo: `https://huggingface.co/spaces/Prahaladha/chaosagent-openenv`
+- Hugging Face runtime URL: `https://prahaladha-chaosagent-openenv.hf.space`
 - Requirements file: `requirements.txt`
-- Docker image entrypoint: `uvicorn server.app:app --host 0.0.0.0 --port 8000`
-- Hugging Face Space repo URL: `https://huggingface.co/spaces/Prahaladha/chaosagent-openenv`
-- Hugging Face Space runtime URL: `https://prahaladha-chaosagent-openenv.hf.space`
+- Docker entrypoint: `uvicorn server.app:app --host 0.0.0.0 --port 8000`

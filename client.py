@@ -40,6 +40,6 @@ class ChaosAgentEnv(EnvClient[ChaosAgentAction, ChaosAgentObservation, ChaosAgen
                 **obs_data,
                 "done": payload.get("done", obs_data.get("done", False)),
                 "reward": payload.get("reward", obs_data.get("reward")),
-                "metadata": obs_data.get("metadata", {}),
+                "metadata": payload.get("metadata", obs_data.get("metadata", {})),
             }
         )

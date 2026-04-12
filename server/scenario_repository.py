@@ -201,6 +201,7 @@ def _warmup_scenarios() -> Iterable[Scenario]:
         population = int(country["population"])
         yield Scenario(
             id=f"W{index:02d}",
+            benchmark_task_id="task1",
             question=f"What is the population of {name}?",
             answer={"population": population},
             required_facts=[
@@ -245,6 +246,7 @@ def _beginner_scenarios() -> Iterable[Scenario]:
         gdp_per_capita = float(country["gdp_per_capita"])
         yield Scenario(
             id=f"B{index:02d}",
+            benchmark_task_id="task1",
             question=(
                 f"What is the GDP per capita of the country whose capital is "
                 f"{capital}? Express it in USD."
@@ -321,6 +323,7 @@ def _intermediate_scenarios() -> Iterable[Scenario]:
         factor = round(max(left_density, right_density) / lower_density, 1)
         yield Scenario(
             id=f"I{index:02d}",
+            benchmark_task_id="task2",
             question=(
                 f"Compare the population density of {left_name} and {right_name}. "
                 "Which is higher and by what factor? Population density equals "
@@ -387,6 +390,7 @@ def _expert_scenarios() -> Iterable[Scenario]:
         status_phrase = "matches" if accurate else "does not match"
         yield Scenario(
             id=f"E{index:02d}",
+            benchmark_task_id="task3",
             question=(
                 f"{name} reported revenue of ${claim:.2f}B last quarter. Verify "
                 "this claim using at least two independent sources. Is the claim "
@@ -521,11 +525,21 @@ class ScenarioRepository:
         *,
         rng: random.Random,
         difficulty: DifficultyTier | str | None = None,
+        benchmark_task_id: str | None = None,
     ) -> Scenario:
         candidates = self.all()
+        if benchmark_task_id is not None:
+            candidates = [
+                scenario
+                for scenario in candidates
+                if scenario.benchmark_task_id == benchmark_task_id
+            ]
         if difficulty is not None:
             tier = DifficultyTier(difficulty)
             candidates = [scenario for scenario in candidates if scenario.difficulty == tier]
         if not candidates:
-            raise ValueError(f"No scenarios available for difficulty={difficulty!r}")
+            raise ValueError(
+                "No scenarios available for "
+                f"difficulty={difficulty!r}, benchmark_task_id={benchmark_task_id!r}"
+            )
         return rng.choice(candidates)

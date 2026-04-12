@@ -60,9 +60,15 @@ class LiveTools:
         name: value for name, value in vars(math).items() if not name.startswith("_")
     }
 
-    def __init__(self, *, now: datetime | None = None, python_timeout_s: float = 2.0):
+    def __init__(
+        self,
+        *,
+        now: datetime | None = None,
+        python_timeout_s: float = 2.0,
+        initial_files: dict[str, str] | None = None,
+    ):
         self.scratchpad: dict[str, Any] = {}
-        self.virtual_files: dict[str, str] = {}
+        self.virtual_files: dict[str, str] = dict(initial_files or {})
         self.virtual_tables: dict[str, list[dict[str, Any]]] = {}
         self.notifications: list[dict[str, Any]] = []
         self.scheduled_tasks: list[dict[str, Any]] = []
