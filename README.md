@@ -1,15 +1,3 @@
----
-title: ChaosAgent OpenEnv
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 8000
-suggested_hardware: cpu-basic
-header: mini
-short_description: OpenEnv benchmark for resilient tool use under failures.
-pinned: false
----
-
 # ChaosAgent
 
 ChaosAgent is an OpenEnv benchmark for agents operating under unreliable tools.
